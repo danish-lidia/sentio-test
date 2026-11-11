@@ -5,13 +5,11 @@ import { createContext, useContext, useState, useEffect } from "react"
 import { ethers } from "ethers"
 import { useToast } from "@/components/ui/use-toast"
 
-// Contract ABIs and addresses
 import dETHAbi from "@/lib/abis/dETH.json"
 import sETHAbi from "@/lib/abis/sETH.json"
 import governanceAbi from "@/lib/abis/governance.json"
 import stakingDashboardAbi from "@/lib/abis/stakingDashboard.json"
 
-// Sepolia addresses come from .env.local. Empty means the token contract is not configured.
 const DETH_ADDRESS = process.env.NEXT_PUBLIC_DETH_ADDRESS || ""
 const SETH_ADDRESS = process.env.NEXT_PUBLIC_SETH_ADDRESS || ""
 const GOVERNANCE_ADDRESS = process.env.NEXT_PUBLIC_GOVERNANCE_ADDRESS || ""
@@ -35,6 +33,12 @@ type Web3ContextType = {
   chainId: number | null
   refreshBalances: () => Promise<void>
   networkName: string
+  ethBalance: string | null
+  dETHBalance: string | null
+  sETHBalance: string | null
+  dETHAvailable: boolean
+  sETHAvailable: boolean
+  balancesLoading: boolean
 }
 
 const Web3Context = createContext<Web3ContextType>({
@@ -51,6 +55,12 @@ const Web3Context = createContext<Web3ContextType>({
   chainId: null,
   refreshBalances: async () => {},
   networkName: "",
+  ethBalance: null,
+  dETHBalance: null,
+  sETHBalance: null,
+  dETHAvailable: Boolean(DETH_ADDRESS),
+  sETHAvailable: Boolean(SETH_ADDRESS),
+  balancesLoading: false,
 })
 
 export const useWeb3 = () => useContext(Web3Context)
@@ -67,76 +77,81 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
   const [chainId, setChainId] = useState<number | null>(null)
   const [networkName, setNetworkName] = useState("")
   const [hasShownConnectToast, setHasShownConnectToast] = useState(false)
+  const [ethBalance, setEthBalance] = useState<string | null>(null)
+  const [dETHBalance, setDETHBalance] = useState<string | null>(null)
+  const [sETHBalance, setSETHBalance] = useState<string | null>(null)
+  const [balancesLoading, setBalancesLoading] = useState(false)
 
   const { toast } = useToast()
 
-  // Function to get ETH balance directly from RPC
-  const getEthBalanceDirectly = async (address: string) => {
+  const fetchBalances = async (address: string) => {
     try {
-      // Create direct RPC provider
-      const directProvider = new ethers.JsonRpcProvider(RPC_URL)
+      setBalancesLoading(true)
+      const rpcProvider = new ethers.JsonRpcProvider(RPC_URL)
 
-      // Get balance
-      const balance = await directProvider.getBalance(address)
-      console.log("Direct ETH Balance check:", ethers.formatEther(balance), "ETH")
+      const bal = await rpcProvider.getBalance(address)
+      setEthBalance(ethers.formatEther(bal))
 
-      return ethers.formatEther(balance)
+      if (DETH_ADDRESS) {
+        try {
+          const dETH = new ethers.Contract(DETH_ADDRESS, dETHAbi, rpcProvider)
+          const dETHBal = await dETH.balanceOf(address)
+          setDETHBalance(ethers.formatEther(dETHBal))
+        } catch (error) {
+          console.error("Error fetching dETH balance:", error)
+          setDETHBalance(null)
+        }
+      }
+
+      if (SETH_ADDRESS) {
+        try {
+          const sETH = new ethers.Contract(SETH_ADDRESS, sETHAbi, rpcProvider)
+          const sETHBal = await sETH.balanceOf(address)
+          setSETHBalance(ethers.formatEther(sETHBal))
+        } catch (error) {
+          console.error("Error fetching sETH balance:", error)
+          setSETHBalance(null)
+        }
+      }
     } catch (error) {
-      console.error("Error getting direct ETH balance:", error)
-      return "0"
+      console.error("Error fetching balances:", error)
+    } finally {
+      setBalancesLoading(false)
     }
   }
 
-  // Ensure contracts are connected with the correct signer
   const connectWallet = async () => {
     if (typeof window !== "undefined" && window.ethereum) {
       try {
-        console.log("Connecting wallet...")
-
-        // Request account access
         const accounts = await window.ethereum.request({
           method: "eth_requestAccounts",
         })
 
         const userAddress = accounts[0]
-        console.log("Connected account:", userAddress)
 
-        // Check current chain ID
-        const chainIdHex = await window.ethereum.request({
-          method: "eth_chainId",
-        })
+        const chainIdHex = await window.ethereum.request({ method: "eth_chainId" })
         const currentChainId = Number.parseInt(chainIdHex, 16)
-        console.log("Current chain ID:", currentChainId)
 
-        // If not on the correct network, ask user to switch
         if (currentChainId !== CHAIN_ID) {
-          console.log("Not on Sepolia, attempting to switch...")
           try {
             await window.ethereum.request({
               method: "wallet_switchEthereumChain",
               params: [{ chainId: `0x${CHAIN_ID.toString(16)}` }],
             })
-            console.log("Successfully switched network")
           } catch (switchError: any) {
             if (switchError.code === 4902) {
-              console.log("Network not found, adding network...")
               await window.ethereum.request({
                 method: "wallet_addEthereumChain",
                 params: [
                   {
                     chainId: `0x${CHAIN_ID.toString(16)}`,
                     chainName: "Sepolia",
-                    nativeCurrency: {
-                      name: "ETH",
-                      symbol: "ETH",
-                      decimals: 18,
-                    },
+                    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
                     rpcUrls: [RPC_URL],
                     blockExplorerUrls: [EXPLORER_URL],
                   },
                 ],
               })
-              console.log("Network added")
             } else {
               throw switchError
             }
@@ -144,19 +159,9 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const directProvider = new ethers.JsonRpcProvider(RPC_URL)
-        console.log("Created direct provider to RPC")
-
-        // Create browser provider for wallet interaction
         const browserProvider = new ethers.BrowserProvider(window.ethereum)
-        console.log("Created browser provider")
-
-        // Get signer from browser provider
         const web3Signer = await browserProvider.getSigner()
-        console.log("Got signer:", await web3Signer.getAddress())
-
-        // Get network information
         const network = await directProvider.getNetwork()
-        console.log("Network info:", network.name, network.chainId)
 
         setNetworkName("Connected")
         setAccount(userAddress)
@@ -165,37 +170,18 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsConnected(true)
         setChainId(Number(network.chainId))
 
-        // Print contract addresses for debugging
-        console.log("Contract addresses:", {
-          dETH: DETH_ADDRESS,
-          sETH: SETH_ADDRESS,
-          governance: GOVERNANCE_ADDRESS,
-          stakingDashboard: STAKING_DASHBOARD_ADDRESS,
-        })
-
         try {
           if (DETH_ADDRESS) {
-            const dETH = new ethers.Contract(DETH_ADDRESS, dETHAbi, web3Signer)
-            console.log("dETH contract initialized:", dETH.target)
-            setDETHContract(dETH)
+            setDETHContract(new ethers.Contract(DETH_ADDRESS, dETHAbi, web3Signer))
           }
-
           if (SETH_ADDRESS) {
-            const sETH = new ethers.Contract(SETH_ADDRESS, sETHAbi, web3Signer)
-            console.log("sETH contract initialized:", sETH.target)
-            setSETHContract(sETH)
+            setSETHContract(new ethers.Contract(SETH_ADDRESS, sETHAbi, web3Signer))
           }
-
           if (GOVERNANCE_ADDRESS) {
-            const governance = new ethers.Contract(GOVERNANCE_ADDRESS, governanceAbi, web3Signer)
-            console.log("Governance contract initialized:", governance.target)
-            setGovernanceContract(governance)
+            setGovernanceContract(new ethers.Contract(GOVERNANCE_ADDRESS, governanceAbi, web3Signer))
           }
-
           if (STAKING_DASHBOARD_ADDRESS) {
-            const stakingDashboard = new ethers.Contract(STAKING_DASHBOARD_ADDRESS, stakingDashboardAbi, web3Signer)
-            console.log("StakingDashboard contract initialized:", stakingDashboard.target)
-            setStakingDashboardContract(stakingDashboard)
+            setStakingDashboardContract(new ethers.Contract(STAKING_DASHBOARD_ADDRESS, stakingDashboardAbi, web3Signer))
           }
         } catch (contractError) {
           console.error("Error initializing contracts:", contractError)
@@ -206,31 +192,8 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
           })
         }
 
-        // Get ETH balance directly from RPC
-        const directBalance = await getEthBalanceDirectly(userAddress)
-        console.log("Set ETH balance to:", directBalance)
+        await fetchBalances(userAddress)
 
-        if (DETH_ADDRESS) {
-          try {
-            const dETH = new ethers.Contract(DETH_ADDRESS, dETHAbi, directProvider)
-            const dETHBal = await dETH.balanceOf(userAddress)
-            console.log("dETH balance:", ethers.formatEther(dETHBal))
-          } catch (error) {
-            console.error("Error getting dETH balance:", error)
-          }
-        }
-
-        if (SETH_ADDRESS) {
-          try {
-            const sETH = new ethers.Contract(SETH_ADDRESS, sETHAbi, directProvider)
-            const sETHBal = await sETH.balanceOf(userAddress)
-            console.log("sETH balance:", ethers.formatEther(sETHBal))
-          } catch (error) {
-            console.error("Error getting sETH balance:", error)
-          }
-        }
-
-        // Only show toast when first connected
         if (!hasShownConnectToast) {
           toast({
             title: "Wallet Connected",
@@ -260,6 +223,9 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
     setSigner(null)
     setIsConnected(false)
     setHasShownConnectToast(false)
+    setEthBalance(null)
+    setDETHBalance(null)
+    setSETHBalance(null)
 
     toast({
       title: "Wallet Disconnected",
@@ -269,62 +235,29 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshBalances = async () => {
     if (account) {
-      try {
-        console.log("Refreshing balances for account:", account)
-
-        // Get ETH balance directly from RPC
-        const directBalance = await getEthBalanceDirectly(account)
-        console.log("Updated ETH balance:", directBalance)
-
-        if (provider && DETH_ADDRESS) {
-          try {
-            const dETH = new ethers.Contract(DETH_ADDRESS, dETHAbi, provider)
-            const dETHBal = await dETH.balanceOf(account)
-            console.log("Updated dETH balance:", ethers.formatEther(dETHBal))
-          } catch (error) {
-            console.error("Error refreshing dETH balance:", error)
-          }
-        }
-
-        if (provider && SETH_ADDRESS) {
-          try {
-            const sETH = new ethers.Contract(SETH_ADDRESS, sETHAbi, provider)
-            const sETHBal = await sETH.balanceOf(account)
-            console.log("Updated sETH balance:", ethers.formatEther(sETHBal))
-          } catch (error) {
-            console.error("Error refreshing sETH balance:", error)
-          }
-        }
-      } catch (error) {
-        console.error("Error refreshing balances:", error)
-      }
+      await fetchBalances(account)
     }
   }
 
-  // Listen for account changes
+  // Listen for account and chain changes
   useEffect(() => {
     if (typeof window !== "undefined" && window.ethereum) {
       window.ethereum.on("accountsChanged", async (accounts: string[]) => {
-        console.log("Account changed:", accounts)
         if (accounts.length > 0) {
           setAccount(accounts[0])
-
-          // Get ETH balance directly from RPC
-          const directBalance = await getEthBalanceDirectly(accounts[0])
-          console.log("Updated ETH balance after account change:", directBalance)
-
-          refreshBalances()
+          await fetchBalances(accounts[0])
         } else {
           setAccount(null)
           setIsConnected(false)
           setHasShownConnectToast(false)
+          setEthBalance(null)
+          setDETHBalance(null)
+          setSETHBalance(null)
         }
       })
 
-      // Add listener for chain changes
       window.ethereum.on("chainChanged", async (chainId: string) => {
         const newChainId = Number.parseInt(chainId, 16)
-        console.log("Chain changed to:", newChainId)
         setChainId(newChainId)
 
         if (newChainId !== CHAIN_ID) {
@@ -336,13 +269,13 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsConnected(false)
           setNetworkName("")
           setHasShownConnectToast(false)
+          setEthBalance(null)
+          setDETHBalance(null)
+          setSETHBalance(null)
         } else {
           setNetworkName("Connected")
           if (account) {
-            // If there's already a connected account, refresh data
-            const directBalance = await getEthBalanceDirectly(account)
-            console.log("Updated ETH balance after chain change:", directBalance)
-            refreshBalances()
+            await fetchBalances(account)
           }
         }
       })
@@ -355,16 +288,13 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [account])
 
-  // Auto connect if previously connected
+  // Auto-connect if previously connected
   useEffect(() => {
     const checkConnection = async () => {
       if (typeof window !== "undefined" && window.ethereum) {
         try {
-          const accounts = await window.ethereum.request({
-            method: "eth_accounts",
-          })
+          const accounts = await window.ethereum.request({ method: "eth_accounts" })
           if (accounts.length > 0) {
-            console.log("Auto-connecting previously connected account")
             connectWallet()
           }
         } catch (error) {
@@ -372,26 +302,19 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     }
-
     checkConnection()
   }, [])
 
-  // Refresh balances periodically
+  // Refresh balances every 15 seconds when connected
   useEffect(() => {
     let intervalId: NodeJS.Timeout
-
     if (isConnected && account) {
-      // Refresh balances every 15 seconds
       intervalId = setInterval(() => {
-        console.log("Periodic balance refresh")
         refreshBalances()
       }, 15000)
     }
-
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId)
-      }
+      if (intervalId) clearInterval(intervalId)
     }
   }, [isConnected, account])
 
@@ -411,6 +334,12 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
         chainId,
         refreshBalances,
         networkName,
+        ethBalance,
+        dETHBalance,
+        sETHBalance,
+        dETHAvailable: Boolean(DETH_ADDRESS),
+        sETHAvailable: Boolean(SETH_ADDRESS),
+        balancesLoading,
       }}
     >
       {children}

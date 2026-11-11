@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useWeb3 } from "@/components/web3-provider"
 import { ethers } from "ethers"
 import { Wallet, Layers, Users, BarChart3, ArrowDownToLine, ArrowUpFromLine, RefreshCw } from "lucide-react"
+import { fmtBalance } from "@/lib/utils"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
@@ -121,7 +122,7 @@ export function StakingDashboard() {
             <h3 className="text-sm font-medium text-lightblue-700">Available Balance</h3>
             <Wallet className="h-5 w-5 text-lightblue-500" />
           </div>
-          <div className="text-2xl font-bold text-lightblue-950">{Number.parseFloat(dETHBalance).toFixed(4)}</div>
+          <div className="text-2xl font-bold text-lightblue-950">{fmtBalance(dETHBalance)}</div>
           <div className="text-sm font-medium text-lightblue-600">dETH</div>
         </div>
 
@@ -130,7 +131,7 @@ export function StakingDashboard() {
             <h3 className="text-sm font-medium text-lightblue-700">Staked Balance</h3>
             <Layers className="h-5 w-5 text-lightblue-500" />
           </div>
-          <div className="text-2xl font-bold text-lightblue-950">{Number.parseFloat(sETHBalance).toFixed(4)}</div>
+          <div className="text-2xl font-bold text-lightblue-950">{fmtBalance(sETHBalance)}</div>
           <div className="text-sm font-medium text-lightblue-600">sETH</div>
         </div>
 

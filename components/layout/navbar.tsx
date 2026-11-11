@@ -16,7 +16,36 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { CoinVaultLogo } from "@/components/CoinVault-logo"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+
+const fmt = (balance: string | null) =>
+  balance !== null ? Number.parseFloat(balance).toFixed(4) : "..."
+
+function BalanceRow({
+  label,
+  balance,
+  available,
+  loading,
+}: {
+  label: string
+  balance: string | null
+  available: boolean
+  loading: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between py-1">
+      <span className="text-sm text-lightblue-600 w-10">{label}</span>
+      <span className="text-sm font-mono font-medium tabular-nums">
+        {!available ? (
+          <span>—</span>
+        ) : loading && balance === null ? (
+          <span className="text-lightblue-400">...</span>
+        ) : (
+          fmt(balance)
+        )}
+      </span>
+    </div>
+  )
+}
 
 export function Navbar() {
   const pathname = usePathname()
@@ -25,8 +54,13 @@ export function Navbar() {
     connectWallet,
     disconnectWallet,
     isConnected,
-    networkName,
     refreshBalances,
+    ethBalance,
+    dETHBalance,
+    sETHBalance,
+    dETHAvailable,
+    sETHAvailable,
+    balancesLoading,
   } = useWeb3()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -45,19 +79,13 @@ export function Navbar() {
     const handleScroll = () => {
       setScrolled(window.scrollY > 10)
     }
-
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
-  // Close mobile menu when route changes
   useEffect(() => {
     setMobileMenuOpen(false)
   }, [pathname])
-
-  const formatBalance = (balance: string) => {
-    return Number.parseFloat(balance).toFixed(4)
-  }
 
   const copyAddress = () => {
     if (account) {
@@ -70,7 +98,7 @@ export function Navbar() {
   const handleRefresh = async () => {
     setIsRefreshing(true)
     await refreshBalances()
-    setTimeout(() => setIsRefreshing(false), 1000)
+    setIsRefreshing(false)
   }
 
   return (
@@ -81,7 +109,7 @@ export function Navbar() {
         <div className="container mx-auto px-4 py-3">
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center justify-between">
-            <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-4 lg:space-x-8">
               <Link href="/" className="flex items-center gap-2">
                 <CoinVaultLogo size="sm" textColor="text-white" />
               </Link>
@@ -91,7 +119,7 @@ export function Navbar() {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors relative group ${
+                    className={`px-1 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors relative group ${
                       pathname === item.href
                         ? "text-white font-semibold"
                         : "text-white/90 hover:text-white hover:bg-white/10"
@@ -99,49 +127,78 @@ export function Navbar() {
                   >
                     {item.name}
                     {pathname === item.href && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-full"></span>
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-full" />
                     )}
                   </Link>
                 ))}
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               {isConnected ? (
-                <div className="flex items-center space-x-3">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="hidden lg:flex items-center space-x-3 bg-lightblue-50 px-4 py-2 rounded-lg">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-lightblue-500 hover:text-lightblue-700"
-                            onClick={handleRefresh}
-                            disabled={isRefreshing}
-                          >
-                            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-                          </Button>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Your wallet balances</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                <>
+                  <div className="hidden wide:flex items-center gap-3 bg-lightblue-50 px-4 py-2 rounded-lg">
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-lightblue-500 font-medium">ETH</span>
+                        <span className="font-mono font-semibold text-lightblue-900 tabular-nums">
+                          {balancesLoading && ethBalance === null ? (
+                            <span className="text-lightblue-400">...</span>
+                          ) : (
+                            fmt(ethBalance)
+                          )}
+                        </span>
+                      </div>
+                      <span className="text-lightblue-200">|</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-lightblue-500 font-medium">dETH</span>
+                        <span className="font-mono font-semibold text-lightblue-900 tabular-nums">
+                          {!dETHAvailable ? (
+                            <span>—</span>
+                          ) : balancesLoading && dETHBalance === null ? (
+                            <span className="text-lightblue-400">...</span>
+                          ) : (
+                            fmt(dETHBalance)
+                          )}
+                        </span>
+                      </div>
+                      <span className="text-lightblue-200">|</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-lightblue-500 font-medium">sETH</span>
+                        <span className="font-mono font-semibold text-lightblue-900 tabular-nums">
+                          {!sETHAvailable ? (
+                            <span>—</span>
+                          ) : balancesLoading && sETHBalance === null ? (
+                            <span className="text-lightblue-400">...</span>
+                          ) : (
+                            fmt(sETHBalance)
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-lightblue-500 hover:text-lightblue-700"
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                    </Button>
+                  </div>
 
+                  {/* Account dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="border-lightblue-200 bg-white hover:bg-lightblue-50">
                         <div className="flex items-center">
-                          <div className="flex items-center mr-2">
-                            <div className="h-2 w-2 rounded-full bg-green-500 mr-2"></div>
-                            <span className="hidden md:inline-block font-medium">
-                              {account ? `${account.substring(0, 6)}...${account.substring(account.length - 4)}` : ""}
-                            </span>
-                            <span className="md:hidden">Account</span>
-                          </div>
-                          <ChevronDown className="h-4 w-4 text-lightblue-500" />
+                          <div className="h-2 w-2 rounded-full bg-green-500 mr-2" />
+                          <span className="font-medium">
+                            {account
+                              ? `${account.substring(0, 6)}...${account.substring(account.length - 4)}`
+                              : ""}
+                          </span>
+                          <ChevronDown className="ml-2 h-4 w-4 text-lightblue-500" />
                         </div>
                       </Button>
                     </DropdownMenuTrigger>
@@ -154,6 +211,7 @@ export function Navbar() {
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
 
+                      {/* Address */}
                       <div className="px-2 py-2">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-medium text-lightblue-700">Address</span>
@@ -182,6 +240,29 @@ export function Navbar() {
                       </div>
 
                       <DropdownMenuSeparator />
+
+                      {/* Balances */}
+                      <div className="px-3 py-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-lightblue-500 uppercase tracking-wide">
+                            Balances
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 text-lightblue-400 hover:text-lightblue-600"
+                            onClick={handleRefresh}
+                            disabled={isRefreshing}
+                          >
+                            <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                          </Button>
+                        </div>
+                        <BalanceRow label="ETH" balance={ethBalance} available={true} loading={balancesLoading} />
+                        <BalanceRow label="dETH" balance={dETHBalance} available={dETHAvailable} loading={balancesLoading} />
+                        <BalanceRow label="sETH" balance={sETHBalance} available={sETHAvailable} loading={balancesLoading} />
+                      </div>
+
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={disconnectWallet}
                         className="cursor-pointer text-red-500 focus:text-red-500"
@@ -191,7 +272,7 @@ export function Navbar() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </div>
+                </>
               ) : (
                 <Button onClick={connectWallet} className="bg-white hover:bg-white/90 text-[#67c4ff]">
                   Connect Wallet
@@ -206,25 +287,47 @@ export function Navbar() {
               <CoinVaultLogo size="sm" showText={true} className="flex" textColor="text-white" />
             </Link>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               {isConnected ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="bg-white text-lightblue-700 border-lightblue-200">
                       <Wallet className="mr-2 h-4 w-4" />
-                      <span>Account</span>
+                      <span>Wallet</span>
                       <Badge variant="outline" className="ml-2 bg-green-500/20 text-green-500 border-green-500 text-xs">
-                        Connected
+                        •
                       </Badge>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>Wallet Balances</DropdownMenuLabel>
+                    <DropdownMenuLabel className="flex items-center justify-between">
+                      <span>Balances</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-lightblue-400 hover:text-lightblue-600"
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                      >
+                        <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                      </Button>
+                    </DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    <div className="px-3 py-1">
+                      <BalanceRow label="ETH" balance={ethBalance} available={true} />
+                      <BalanceRow label="dETH" balance={dETHBalance} available={dETHAvailable} />
+                      <BalanceRow label="sETH" balance={sETHBalance} available={sETHAvailable} />
+                    </div>
+                    <DropdownMenuSeparator />
+                    <div className="px-3 py-1 pb-2">
+                      <div className="text-xs text-lightblue-500 font-mono truncate">
+                        {account ? `${account.substring(0, 6)}...${account.substring(account.length - 4)}` : ""}
+                      </div>
+                    </div>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={disconnectWallet} className="cursor-pointer text-red-500">
                       <LogOut className="mr-2 h-4 w-4" />
-                      Disconnect Wallet
+                      Disconnect
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -274,8 +377,8 @@ export function Navbar() {
         </div>
       )}
 
-      {/* Spacer to prevent content from being hidden under the navbar */}
-      <div className="h-14"></div>
+      {/* Spacer */}
+      <div className="h-14" />
     </>
   )
 }

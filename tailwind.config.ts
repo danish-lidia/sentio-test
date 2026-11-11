@@ -19,6 +19,9 @@ const config = {
       },
     },
     extend: {
+      screens: {
+        "wide": "1360px",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

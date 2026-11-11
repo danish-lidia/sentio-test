@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { ethers } from "ethers"
 import { useToast } from "@/components/ui/use-toast"
 import { Layers, ArrowUpFromLine, Loader2, AlertCircle } from "lucide-react"
+import { fmtBalance } from "@/lib/utils"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -124,7 +125,7 @@ export function StakeUnstake() {
       const amount = ethers.parseEther(stakeAmount)
 
       // Check if user has enough dETH
-      if (Number.parseFloat(dETHBalance) < Number.parseFloat(stakeAmount)) {
+      if (Number.parseFloat(dETHBalance ?? "0") < Number.parseFloat(stakeAmount)) {
         toast({
           title: "Insufficient dETH Balance",
           description: "You don't have enough dETH to stake this amount.",
@@ -179,7 +180,7 @@ export function StakeUnstake() {
       const amount = ethers.parseEther(unstakeAmount)
 
       // Check if user has enough sETH
-      if (Number.parseFloat(sETHBalance) < Number.parseFloat(unstakeAmount)) {
+      if (Number.parseFloat(sETHBalance ?? "0") < Number.parseFloat(unstakeAmount)) {
         toast({
           title: "Insufficient sETH Balance",
           description: "You don't have enough sETH to unstake this amount.",
@@ -217,11 +218,11 @@ export function StakeUnstake() {
   }
 
   const setMaxStake = () => {
-    setStakeAmount(dETHBalance)
+    setStakeAmount(dETHBalance ?? "0")
   }
 
   const setMaxUnstake = () => {
-    setUnstakeAmount(sETHBalance)
+    setUnstakeAmount(sETHBalance ?? "0")
   }
 
   if (!isConnected) {
@@ -270,7 +271,7 @@ export function StakeUnstake() {
                 </div>
                 <div className="flex justify-between mt-2 text-sm">
                   <span className="text-lightblue-700">
-                    Available: {Number.parseFloat(dETHBalance).toFixed(4)} dETH
+                    Available: {fmtBalance(dETHBalance)} dETH
                   </span>
                   <button onClick={setMaxStake} className="text-lightblue-500 hover:underline">
                     Max
@@ -360,7 +361,7 @@ export function StakeUnstake() {
                 </div>
                 <div className="flex justify-between mt-2 text-sm">
                   <span className="text-lightblue-700">
-                    Available: {Number.parseFloat(sETHBalance).toFixed(4)} sETH
+                    Available: {fmtBalance(sETHBalance)} sETH
                   </span>
                   <button onClick={setMaxUnstake} className="text-lightblue-500 hover:underline">
                     Max

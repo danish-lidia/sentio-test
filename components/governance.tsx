@@ -96,7 +96,7 @@ export function Governance() {
       setIsCreating(true)
 
       // Check if user has enough sETH
-      if (Number.parseFloat(sETHBalance) < 1) {
+      if (Number.parseFloat(sETHBalance ?? "0") < 1) {
         toast({
           title: "Insufficient sETH Balance",
           description: "You need at least 1 sETH to create a proposal.",
@@ -147,7 +147,7 @@ export function Governance() {
       setIsVoting({ ...isVoting, [proposalId]: true })
 
       // Check if user has sETH for voting
-      if (Number.parseFloat(sETHBalance) <= 0) {
+      if (Number.parseFloat(sETHBalance ?? "0") <= 0) {
         toast({
           title: "No Voting Power",
           description: "You need sETH tokens to vote on proposals.",
@@ -519,7 +519,7 @@ export function Governance() {
                   </p>
                 </div>
 
-                {Number.parseFloat(sETHBalance) < 1 && (
+                {Number.parseFloat(sETHBalance ?? "0") < 1 && (
                   <Alert variant="warning" className="bg-amber-50 border-amber-200 text-amber-700">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
@@ -532,7 +532,7 @@ export function Governance() {
             <CardFooter>
               <Button
                 onClick={createProposal}
-                disabled={!description || !target || isCreating || Number.parseFloat(sETHBalance) < 1}
+                disabled={!description || !target || isCreating || Number.parseFloat(sETHBalance ?? "0") < 1}
                 className="w-full"
               >
                 {isCreating ? (

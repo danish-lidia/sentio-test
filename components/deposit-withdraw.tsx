@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { ethers } from "ethers"
 import { useToast } from "@/components/ui/use-toast"
 import { PlusCircle, MinusCircle, Loader2 } from "lucide-react"
+import { fmtBalance } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export function DepositWithdraw() {
@@ -27,8 +28,8 @@ export function DepositWithdraw() {
 
   const setMaxDeposit = () => {
     // Leave a small amount for gas
-    if (Number.parseFloat(ethBalance) > 0.01) {
-      const maxAmount = (Number.parseFloat(ethBalance) - 0.01).toFixed(18)
+    if (Number.parseFloat(ethBalance ?? "0") > 0.01) {
+      const maxAmount = (Number.parseFloat(ethBalance ?? "0") - 0.01).toFixed(18)
       setDepositAmount(maxAmount)
     } else {
       setDepositAmount("0")
@@ -43,7 +44,7 @@ export function DepositWithdraw() {
       const amount = ethers.parseEther(depositAmount)
 
       // Check if user has enough ETH
-      if (Number.parseFloat(ethBalance) < Number.parseFloat(depositAmount)) {
+      if (Number.parseFloat(ethBalance ?? "0") < Number.parseFloat(depositAmount)) {
         toast({
           title: "Insufficient ETH Balance",
           description: "You don't have enough ETH to complete this deposit.",
@@ -80,7 +81,7 @@ export function DepositWithdraw() {
   }
 
   const setMaxWithdraw = () => {
-    setWithdrawAmount(dETHBalance)
+    setWithdrawAmount(dETHBalance ?? "0")
   }
 
   const handleWithdraw = async () => {
@@ -91,7 +92,7 @@ export function DepositWithdraw() {
       const amount = ethers.parseEther(withdrawAmount)
 
       // Check if user has enough dETH
-      if (Number.parseFloat(dETHBalance) < Number.parseFloat(withdrawAmount)) {
+      if (Number.parseFloat(dETHBalance ?? "0") < Number.parseFloat(withdrawAmount)) {
         toast({
           title: "Insufficient dETH Balance",
           description: "You don't have enough dETH to complete this withdrawal.",
@@ -172,7 +173,7 @@ export function DepositWithdraw() {
                   </div>
                 </div>
                 <div className="flex justify-between mt-2 text-sm">
-                  <span className="text-lightblue-700">Available: {Number.parseFloat(ethBalance).toFixed(4)} ETH</span>
+                  <span className="text-lightblue-700">Available: {fmtBalance(ethBalance)} ETH</span>
                   <button onClick={setMaxDeposit} className="text-lightblue-500 hover:underline">
                     Max
                   </button>
@@ -225,7 +226,7 @@ export function DepositWithdraw() {
                 </div>
                 <div className="flex justify-between mt-2 text-sm">
                   <span className="text-lightblue-700">
-                    Available: {Number.parseFloat(dETHBalance).toFixed(4)} dETH
+                    Available: {fmtBalance(dETHBalance)} dETH
                   </span>
                   <button onClick={setMaxWithdraw} className="text-lightblue-500 hover:underline">
                     Max
