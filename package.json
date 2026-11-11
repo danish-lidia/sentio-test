@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run backend\" \"next dev --turbopack\"",
+    "build": "next build",
     "backend": "cd backend && node index.js",
     "start": "concurrently \"npm run backend\" \"next dev\""
   },
